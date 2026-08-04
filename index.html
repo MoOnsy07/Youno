@@ -393,9 +393,9 @@
   }, { threshold: 0.25 });
   revealEls.forEach(el => io.observe(el));
 
-  // notify-me phone form → يفتح واتساب فيه رسالة جاهزة لرقم البيزنس
-  // ⚠️ استبدل الرقم ده برقم واتساب البيزنس بتاعك (بالكود الدولي بدون + أو أصفار، مثال: 201001234567)
-  const BUSINESS_WHATSAPP = '201000000000';
+  // notify-me phone form → يخزن الرقم فعلياً في جدول subscribers على Supabase
+  const SUPABASE_URL = 'https://zyegcydskeklzfevjvku.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5ZWdjeWRza2VrbHpmZXZqdmt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mjk0NjAsImV4cCI6MjEwMTQwNTQ2MH0.0WcEoOD7FZRWANM3qrwPCASGAZnOi-VO8yZbRMPVlnc';
 
   const phoneInput = document.getElementById('phoneInput');
   const notifyBtn = document.getElementById('notifyBtn');
@@ -406,22 +406,44 @@
     return /^01[0125][0-9]{8}$/.test(cleaned);
   }
 
-  function submitPhone() {
+  async function submitPhone() {
     const value = phoneInput.value.trim();
 
     if (!isValidEgyptianPhone(value)) {
-      notifyMsg.textContent = 'اكتب رقم موبايل مصري صحيح (01xxxxxxxxx)';
+      notifyMsg.textContent = 'اكتب رقم واتساب مصري صحيح (01xxxxxxxxx)';
       notifyMsg.className = 'notify-msg error';
       return;
     }
 
-    const message = `عايز أعرف أول ما تفتحوا! رقمي: ${value}`;
-    const waLink = `https://wa.me/${BUSINESS_WHATSAPP}?text=${encodeURIComponent(message)}`;
-    window.open(waLink, '_blank');
+    notifyBtn.disabled = true;
+    notifyBtn.style.opacity = '0.6';
+    notifyMsg.textContent = 'بنسجّل رقمك...';
+    notifyMsg.className = 'notify-msg';
 
-    notifyMsg.textContent = 'شكراً لاهتمامك بيونو 🤍 هنبعتلك أول ما نفتح!';
-    notifyMsg.className = 'notify-msg success';
-    phoneInput.value = '';
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ phone: value })
+      });
+
+      if (!res.ok) throw new Error('insert failed');
+
+      notifyMsg.textContent = 'شكراً لاهتمامك بيونو 🤍 هنبعتلك أول ما نفتح!';
+      notifyMsg.className = 'notify-msg success';
+      phoneInput.value = '';
+    } catch (err) {
+      notifyMsg.textContent = 'حصل خطأ، جرّب تاني كمان شوية';
+      notifyMsg.className = 'notify-msg error';
+    } finally {
+      notifyBtn.disabled = false;
+      notifyBtn.style.opacity = '1';
+    }
   }
 
   notifyBtn.addEventListener('click', submitPhone);
